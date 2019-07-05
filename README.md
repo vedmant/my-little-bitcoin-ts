@@ -3,6 +3,7 @@
 </p>
 
 # My Little Bitcoin
+## TypeSctipt Implementation
 
 > A simple cryptocurrency implementation on JavaScript in just about 650 lines of code (without comments and client). It also includes WEB GUI written on Vue.js where you can send coins and explore blockchain.
 

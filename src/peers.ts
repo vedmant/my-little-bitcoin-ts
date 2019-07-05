@@ -1,37 +1,90 @@
 import Bus from './bus';
+import WebSocket from 'ws'
+import { BlockError, TransactionError } from './errors'
+import Store from './store'
+import { Block } from './lib/block'
+import { Transaction } from './lib/transaction'
+import * as http from 'http'
+import Debug from 'debug'
 
-const debug = require('debug')('app:peers')
-const WebSocket = require('ws')
-const {BlockError, TransactionError} = require('./errors')
+const debug = Debug('app:peers')
 
-export default (config: any, bus: Bus, store) => ({
+interface Peer {
+  url: string
+  ws: WebSocket
+  timeoutId: any
+  retries: number
+  initial: boolean
+}
 
-  connections: store.peers.map(peer => ({url: peer, ws: null, timeoutId: null, retries: 0, initial: true})),
+interface Message {
+  type: string
+  message?: any
+  blocks?: Block[]
+  block?: Block
+  index?: number
+  transaction?: Transaction
+  [key: string]: any
+}
 
-  server: null,
 
-  write (connection, message) {
-    debug(`Send message: ${message.type} to: ${connection.url}`)
-    connection.ws.send(JSON.stringify(message))
-  },
+export default class Peers {
 
-  broadcast (message) {
+  config: any
+  bus: Bus
+  store: Store
+  peers: Peer[]
+  server: WebSocket.Server
+
+  constructor (config: any, bus: Bus, store: Store) {
+    this.config = config
+    this.bus = bus
+    this.store = store
+    this.peers = store.peers.map(peer => ({url: peer, ws: undefined, timeoutId: undefined, retries: 0, initial: true}))
+  }
+
+  /**
+   * Start websocket p2p server
+   */
+  start () {
+    // Broadacast messages to all peers
+    this.bus.on('block-added-by-me', block => this.broadcast({type: 'new-block', block}))
+    this.bus.on('transaction-added-by-me', transaction => this.broadcast({type: 'new-transaction', transaction}))
+
+    this.peers.forEach((connection, index) => this.connectToPeer(connection, index))
+
+    this.server = new WebSocket.Server({port: this.config.p2pPort})
+    this.server.on('connection', (ws: WebSocket, req: http.IncomingMessage) => this.initConnection(ws, req))
+
+    debug('listening websocket p2p port on: ' + this.config.p2pPort)
+  }
+
+  /**
+   * Send message to peer
+   */
+  write (peer: Peer, message: Message) {
+    debug(`Send message: ${message.type} to: ${peer.url}`)
+    peer.ws.send(JSON.stringify(message))
+  }
+
+  /**
+   * @param message
+   */
+  broadcast (message: Message) {
     debug(`Broadcast message: ${message.type}`)
-    this.connections.filter(c => c.ws).forEach(c => this.write(c, message))
-  },
+    this.peers.filter(c => c.ws).forEach(c => this.write(c, message))
+  }
 
   /**
    * Handle incoming messages
-   *
-   * @param connection
    */
-  initMessageHandler (connection) {
-    const ws = connection.ws
+  initMessageHandler (peer: Peer) {
+    const ws = peer.ws
 
-    ws.on('message', (data) => {
-      let message = ''
+    ws.on('message', (data: WebSocket.Data) => {
+      let message: Message
       try {
-        message = JSON.parse(data)
+        message = JSON.parse(data.toString())
       } catch (e) {
         console.error('Failed to json parse recieved data from peer')
       }
@@ -41,13 +94,13 @@ export default (config: any, bus: Bus, store) => ({
       // TODO: validate requests
       switch (message.type) {
         case 'get-blocks-after':
-          this.write(connection, {type: 'blocks-after', blocks: store.blocksAfter(message.index + 1)})
+          this.write(peer, {type: 'blocks-after', blocks: this.store.blocksAfter(message.index + 1)})
           break
 
         case 'blocks-after':
           message.blocks.forEach(block => {
             try {
-              store.addBlock(block)
+              this.store.addBlock(block)
             } catch (e) {
               if (! (e instanceof BlockError) && ! (e instanceof TransactionError)) throw e
             }
@@ -57,118 +110,94 @@ export default (config: any, bus: Bus, store) => ({
         case 'new-block':
           try {
             // Load all blocks needed if recieved block is not next for our chain
-            if (message.block.index - store.lastBlock().index > 1) {
-              return this.write(connection, {type: 'get-blocks-after', index: store.lastBlock().index})
+            if (message.block.index - this.store.lastBlock().index > 1) {
+              return this.write(peer, {type: 'get-blocks-after', index: this.store.lastBlock().index})
             }
-            const block = store.addBlock(message.block)
-            bus.emit('block-added', block)
+            const block = this.store.addBlock(message.block)
+            this.bus.emit('block-added', block)
           } catch (e) {
             if (! (e instanceof BlockError) && ! (e instanceof TransactionError)) throw e
-            this.write(connection, {type: 'error', message: e.message})
+            this.write(peer, {type: 'error', message: e.message})
           }
           break
 
         case 'new-transaction':
           try {
-            store.addTransaction(message.transaction, true)
+            this.store.addTransaction(message.transaction, true)
           } catch (e) {
-            this.write(connection, {type: 'error', message: e.message})
+            this.write(peer, {type: 'error', message: e.message})
           }
           break
       }
     })
-  },
+  }
 
   /**
    * Handle connection errors
-   *
-   * @param connection
-   * @param index
    */
-  initErrorHandler (connection, index) {
-    const closeConnection = (connection, index) => {
-      debug(`Connection broken to: ${connection.url === undefined ? 'incoming' : connection.url}`)
-      connection.ws = null
+  initErrorHandler (peer: Peer, index: number) {
+    const closeConnection = (peer: Peer, index: number) => {
+      debug(`Connection broken to: ${peer.url === undefined ? 'incoming' : peer.url}`)
+      peer.ws = undefined
 
-      // Retry initial connections 3 times
-      if (connection.initial && connection.retries < 4) {
-        connection.retries++
-        debug(`Retry in 3 secs, retries: ${connection.retries}`)
-        connection.timeoutId = setTimeout(() => this.connectToPeer(connection, index), 3000)
+      // Retry initial peers 3 times
+      if (peer.initial && peer.retries < 4) {
+        peer.retries++
+        debug(`Retry in 3 secs, retries: ${peer.retries}`)
+        peer.timeoutId = setTimeout(() => this.connectToPeer(peer, index), 3000)
       }
     }
-    connection.ws.on('close', () => closeConnection(connection, index))
-    connection.ws.on('error', () => closeConnection(connection, index))
-  },
+    peer.ws.on('close', () => closeConnection(peer, index))
+    peer.ws.on('error', () => closeConnection(peer, index))
+  }
 
   /**
    * Handle connection initialization
-   *
-   * @param ws
-   * @param req
-   * @param index
    */
-  initConnection (ws, req = null, index = null) {
-    let connection = null
+  initConnection (ws: WebSocket, req: http.IncomingMessage = undefined, index: number = undefined) {
+    let peer: Peer
     let url = ws.url
 
     if (index === null) {
       // If peer connected to us
       url = req.connection.remoteAddress
-      connection = {url, ws, timeoutId: null, retries: 0, initial: false}
-      this.connections.push(connection)
+      peer = {url, ws, timeoutId: undefined, retries: 0, initial: false}
+      this.peers.push(peer)
       debug(`Peer ${url} connected to us`)
     } else {
       // We connected to peer
-      connection = this.connections[index]
+      peer = this.peers[index]
       debug(`Connected to peer ${url}`)
     }
-    connection.retries = 0
+    peer.retries = 0
 
-    clearTimeout(connection.timeoutId)
-    this.initMessageHandler(connection, index)
-    this.initErrorHandler(connection, index)
+    clearTimeout(peer.timeoutId)
+    this.initMessageHandler(peer)
+    this.initErrorHandler(peer, index)
 
     // Get full blockchain from first peer
     if (index === 0) {
-      this.write(connection, {type: 'get-blocks-after', index: store.lastBlock().index})
+      this.write(peer, {type: 'get-blocks-after', index: this.store.lastBlock().index})
     }
-  },
+  }
 
   /**
    * Connect to peer
-   *
-   * @param connection
-   * @param index
-   * @param req
    */
-  connectToPeer (connection, index = null) {
-    connection.ws = new WebSocket(connection.url)
-    connection.ws.on('open', () => this.initConnection(connection.ws, null, index))
-    connection.ws.on('error', () => {
-      debug(`Connection failed to ${connection.url}`)
+  connectToPeer (peer: Peer, index: number = undefined) {
+    peer.ws = new WebSocket(peer.url)
+    peer.ws.on('open', () => this.initConnection(peer.ws, undefined, index))
+    peer.ws.on('error', () => {
+      debug(`Connection failed to ${peer.url}`)
 
-      // Retry initial connections 3 times
-      if (connection.initial && connection.retries < 4) {
-        debug(`Retry in 3 secs, retries: ${connection.retries}`)
-        connection.retries++
-        connection.timeoutId = setTimeout(() => {
-          this.connectToPeer(connection, index)
+      // Retry initial connection 3 times
+      if (peer.initial && peer.retries < 4) {
+        debug(`Retry in 3 secs, retries: ${peer.retries}`)
+        peer.retries++
+        peer.timeoutId = setTimeout(() => {
+          this.connectToPeer(peer, index)
         }, 3000)
       }
     })
-  },
-
-  start () {
-    // Broadacast messages to all peers
-    bus.on('block-added-by-me', block => this.broadcast({type: 'new-block', block}))
-    bus.on('transaction-added-by-me', transaction => this.broadcast({type: 'new-transaction', transaction}))
-
-    this.connections.forEach((connection, index) => this.connectToPeer(connection, index))
-
-    this.server = new WebSocket.Server({port: config.p2pPort})
-    this.server.on('connection', (ws, req) => this.initConnection(ws, req))
-
-    debug('listening websocket p2p port on: ' + config.p2pPort)
-  },
-})
+  }
+}

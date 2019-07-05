@@ -1,13 +1,19 @@
-require('dotenv').config()
+import dotenv from 'dotenv'
 import Sentry from '@sentry/node'
-// global.debug = require('debug')('app:global')
 import config from './config'
-import bus from './bus'
-import storeFactory from './store'
+import Bus from './bus'
+import Store from './store'
+import Miner from './miner'
+import Server from './server'
+import Peers from './peers'
 
-const store = storeFactory(config, bus)
-const miner = require('./miner')(config, bus, store)
-require('./server')(config, bus, store, miner).start()
+dotenv.config()
+
+const bus = new Bus
+const store = new Store(config, bus)
+const miner = new Miner(config, bus, store)
+const server = new Server(config, bus, store, miner)
+server.start()
 
 if (process.env.APP_ENV === 'production') {
   Sentry.init({dsn: process.env.SENTRY_DSN})
@@ -16,5 +22,7 @@ if (process.env.APP_ENV === 'production') {
 if (config.demoMode) {
   miner.mine(store.wallets[0])
 } else {
-  require('./peers')(config, bus, store).start() // Connect to peers and recieve connections
+  // Connect to peers and recieve connections
+  const peers = new Peers(config, bus, store)
+  peers.start()
 }

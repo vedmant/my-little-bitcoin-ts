@@ -1,13 +1,13 @@
-const {isBlockValid} = require('./block')
+import { Block, checkBlock } from './block'
 
-function isChainValid (chain, difficulty) {
+export function isChainValid (chain: Block[], difficulty: number) {
   for (let i = 1; i < chain.length; i++) {
-    if (! isBlockValid(chain[i - 1], chain[i], difficulty)) {
-      return false
-    }
+    // TODO
+    // if (! checkBlock(chain[i - 1], chain[i], difficulty)) {
+    //   return false
+    // }
   }
 
   return true
 }
 
-module.exports = {isChainValid}

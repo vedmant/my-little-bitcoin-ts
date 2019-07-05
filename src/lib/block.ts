@@ -55,7 +55,9 @@ export function checkBlock (previousBlock: Block, block: Block, difficulty: numb
  *
  * @param block
  */
-export function calculateHash ({index, prevHash, time, transactions, nonce}) {
+export function calculateHash (block: Block) {
+  const {index, prevHash, time, transactions, nonce} = block
+
   return CryptoJS.SHA256(JSON.stringify({index, prevHash, time, transactions, nonce})).toString()
 }
 
@@ -64,13 +66,14 @@ export function calculateHash ({index, prevHash, time, transactions, nonce}) {
  *
  * @return {{index: number, prevHash: string, time: number, transactions: Array, nonce: number}}
  */
-export function makeGenesisBlock () {
-  const block = {
+export function makeGenesisBlock (): Block {
+  const block: Block = {
     index: 0,
     prevHash: '0',
-    time: '1505759228',
+    time: 1505759228,
     transactions: [],
     nonce: 0,
+    hash: '',
   }
   block.hash = calculateHash(block)
 
@@ -85,7 +88,7 @@ export function makeGenesisBlock () {
  * @param wallet {{private: string, public: string}}
  * @return {{index: number, prevHash, time: number, transactions: Array, nonce: number}}
  */
-export function createBlock (transactions: Transaction[], lastBlock, wallet: Wallet) {
+export function createBlock (transactions: Transaction[], lastBlock: Block, wallet: Wallet) {
   transactions = transactions.slice()
   transactions.push(createRewardTransaction(wallet))
   const block = {
@@ -94,6 +97,7 @@ export function createBlock (transactions: Transaction[], lastBlock, wallet: Wal
     time: Math.floor(new Date().getTime() / 1000),
     transactions,
     nonce: 0,
+    hash: '',
   }
   block.hash = calculateHash(block)
 

@@ -1,26 +1,47 @@
-const debug = require('debug')('app:server')
-const path = require('path')
-const express = require('express')
-const bodyParser = require('body-parser')
-const expressWinston = require('express-winston')
-const winston = require('winston')
-const {generateKeyPair} = require('./lib/wallet')
-const {TransactionError, GeneralError} = require('./errors')
+import path from 'path'
+import express, { Request, Response } from 'express'
+import bodyParser from 'body-parser'
+import expressWinston from 'express-winston'
+import winston from 'winston'
+import { generateKeyPair, Wallet } from './lib/wallet'
+import { GeneralError, TransactionError } from './errors'
+import Debug from 'debug'
+import http from 'http'
+import SocketIo from 'socket.io'
+import Bus from './bus'
+import Miner from './miner'
+import Store from './store'
+import { Block } from './lib/block'
+import { Input, Output, Transaction } from './lib/transaction'
 
-module.exports = (config, bus, store, miner) => ({
-  app: null,
-  http: null,
-  io: null,
+const debug = Debug('app:server')
 
-  broadcast (type, data) {
+export default class Server {
+
+  config: any
+  bus: Bus
+  store: Store
+  miner: Miner
+  app: express.Application
+  http: http.Server
+  io: SocketIo.Server
+
+  constructor(config: any, bus: Bus, store: Store, miner: Miner) {
+    this.config = config
+    this.bus = bus
+    this.store = store
+    this.miner = miner
+  }
+
+  broadcast (type: string, data?: any) {
     debug(`Broadcast WS message: ${type}`)
     this.io.emit(type, data)
-  },
+  }
 
   start () {
     this.app = express()
-    this.http = require('http').Server(this.app)
-    this.io = require('socket.io')(this.http)
+    this.http = http.createServer(this.app)
+    this.io = SocketIo(this.http)
 
     // Establish socket.io connection
     this.io.on('connection', function (socket) {
@@ -31,14 +52,14 @@ module.exports = (config, bus, store, miner) => ({
     })
 
     // Broadacast messages
-    bus.on('block-added', block => this.broadcast('block-added', block))
-    bus.on('block-added-by-me', block => this.broadcast('block-added-by-me', block))
-    bus.on('transaction-added-by-me', transaction => this.broadcast('transaction-added', transaction))
-    bus.on('transaction-added', transaction => this.broadcast('transaction-added', transaction))
-    bus.on('balance-updated', balance => this.broadcast('balance-updated', balance))
-    bus.on('mine-start', () => this.broadcast('mine-started'))
-    bus.on('mine-stop', () => this.broadcast('mine-stopped'))
-    bus.on('recieved-funds', (data) => this.broadcast('recieved-funds', data))
+    this.bus.on('block-added', (block: Block) => this.broadcast('block-added', block))
+    this.bus.on('block-added-by-me', (block: Block) => this.broadcast('block-added-by-me', block))
+    this.bus.on('transaction-added-by-me', transaction => this.broadcast('transaction-added', transaction))
+    this.bus.on('transaction-added', transaction => this.broadcast('transaction-added', transaction))
+    this.bus.on('balance-updated', balance => this.broadcast('balance-updated', balance))
+    this.bus.on('mine-start', () => this.broadcast('mine-started'))
+    this.bus.on('mine-stop', () => this.broadcast('mine-stopped'))
+    this.bus.on('recieved-funds', (data) => this.broadcast('recieved-funds', data))
 
     // Parse bodies
     this.app.use(bodyParser.json()) // support json encoded bodies
@@ -46,7 +67,7 @@ module.exports = (config, bus, store, miner) => ({
 
     // Add winston logger
     this.app.use(expressWinston.logger({transports: [new winston.transports.File({
-      filename: 'logs/express.log', json: false, maxsize: 1024 * 1024, maxFiles: 100, tailable: true,
+      filename: 'logs/express.log', maxsize: 1024 * 1024, maxFiles: 100, tailable: true,
     })]}))
 
     // Serve static files
@@ -55,21 +76,21 @@ module.exports = (config, bus, store, miner) => ({
     /*
      * Get short blockchain status
      */
-    this.app.get('/v1/status', (req, res) => res.json({
+    this.app.get('/v1/status', (req: Request, res: Response) => res.json({
       time: Math.floor(new Date().getTime() / 1000),
-      chain: store.chain.slice(Math.max(store.chain.length - 5, 0)),
-      mempool: store.mempool.slice(Math.max(store.mempool.length - 5, 0)),
-      wallets: store.wallets.map(w => ({name: w.name, public: w.public, balance: store.getBalanceForAddress(w.public)})),
-      mining: store.mining,
-      demoMode: !! config.demoMode,
+      chain: this.store.chain.slice(Math.max(this.store.chain.length - 5, 0)),
+      mempool: this.store.mempool.slice(Math.max(this.store.mempool.length - 5, 0)),
+      wallets: this.store.wallets.map(w => ({name: w.name, public: w.public, balance: this.store.getBalanceForAddress(w.public)})),
+      mining: this.store.mining,
+      demoMode: !! this.config.demoMode,
     }))
 
     /*
      * Send money to address
      */
-    this.app.get('/v1/send/:from/:to/:amount', (req, res) => {
+    this.app.get('/v1/send/:from/:to/:amount', (req: Request, res: Response) => {
       try {
-        res.json(store.send(req.params.from, req.params.to, parseInt(req.params.amount)))
+        res.json(this.store.send(req.params.from, req.params.to, parseInt(req.params.amount)))
       } catch (e) {
         if (! (e instanceof GeneralError) && ! (e instanceof TransactionError)) throw e
         res.status(403).send(e.message)
@@ -79,77 +100,81 @@ module.exports = (config, bus, store, miner) => ({
     /*
      * Get block by index
      */
-    this.app.get('/v1/block/:index', (req, res) => res.json({block: store.chain.find(b => b.index === parseInt(req.params.index))}))
+    this.app.get('/v1/block/:index', (req: Request, res: Response) => res.json({
+      block: this.store.chain.find(b => b.index === parseInt(req.params.index))
+    }))
 
     /*
      * Get address
      */
-    this.app.get('/v1/address/:address', (req, res) => {
-      const transactions = store.getTransactionsForAddress(req.params.address)
+    this.app.get('/v1/address/:address', (req: Request, res: Response) => {
+      const transactions = this.store.getTransactionsForAddress(req.params.address)
       res.json({
-        balance: store.getBalanceForAddress(req.params.address),
+        balance: this.store.getBalanceForAddress(req.params.address),
         transactions: transactions.slice(-100).reverse(), // Last 100 transactions
         totalTransactions: transactions.length,
-        totalRecieved: transactions.reduce((acc, tx) => acc + tx.outputs.reduce((acc, o) => acc + (o.address === req.params.address ? o.amount : 0), 0), 0),
+        totalRecieved: transactions.reduce((acc: number, tx: Transaction) =>
+          acc + tx.outputs.reduce((acc: number, o: Output) => acc + (o.address === req.params.address ? o.amount : 0), 0), 0),
       })
     })
 
     /*
      * Get transaction by txid
      */
-    this.app.get('/v1/transaction/:id', (req, res) => {
-      const transaction = store.getTransactions().find(tx => tx.id === req.params.id)
+    this.app.get('/v1/transaction/:id', (req: Request, res: Response) => {
+      const transaction = this.store.getTransactions().find((tx: Transaction) => tx.id === req.params.id)
       if (! transaction) return res.status(404).send('Cant find transaction')
-      const block = store.chain.find(block => block.transactions.find(tx => tx.id === req.params.id))
+      const block = this.store.chain.find((block: Block) => block.transactions.find(tx => tx.id === req.params.id))
       res.json({transaction, block})
     })
 
     /*
      * My Wallets
      */
-    this.app.get('/v1/wallets', (req, res) => res.json(store.wallets.map(wallet => {
-      const transactions = store.getTransactionsForAddress(wallet.public).reverse()
+    this.app.get('/v1/wallets', (req: Request, res: Response) => res.json(this.store.wallets.map((wallet: Wallet) => {
+      const transactions = this.store.getTransactionsForAddress(wallet.public).reverse()
       return {
         name: wallet.name,
         public: wallet.public,
-        balance: store.getBalanceForAddress(wallet.public),
+        balance: this.store.getBalanceForAddress(wallet.public),
         totalTransactions: transactions.length,
         transactions: transactions.slice(Math.max(transactions.length - 100, 0)),
-        totalRecieved: transactions.reduce((acc, tx) => acc + tx.outputs.reduce((acc, o) => acc + (o.address === wallet.public ? o.amount : 0), 0), 0),
-        totalSent: transactions.reduce((acc, tx) => acc + tx.inputs.reduce((acc, i) => acc + (i.address === wallet.public ? i.amount : 0), 0), 0),
+        totalRecieved: transactions.reduce((acc: number, tx: Transaction) => acc + tx.outputs.reduce((acc: number, o: Output) =>
+          acc + (o.address === wallet.public ? o.amount : 0), 0), 0),
+        totalSent: transactions.reduce((acc: number, tx: Transaction) =>
+          acc + tx.inputs.reduce((acc: number, i: Input) => acc + (i.address === wallet.public ? i.amount : 0), 0), 0),
       }
     })))
 
     /*
      * Create new wallet
      */
-    this.app.post('/v1/wallet/create', (req, res) => {
+    this.app.post('/v1/wallet/create', (req: Request, res: Response) => {
       const wallet = {name: req.body.name, ...generateKeyPair()}
-      store.addWallet(wallet)
-      res.json({name: wallet.name, public: wallet.public, balance: store.getBalanceForAddress(wallet.public)})
+      this.store.addWallet(wallet)
+      res.json({name: wallet.name, public: wallet.public, balance: this.store.getBalanceForAddress(wallet.public)})
     })
 
     /*
      * Start mining
      */
-    this.app.get('/v1/mine-start', (req, res) => {
-      store.mining = true
-      bus.emit('mine-start')
-      if (! config.demoMode) miner.mine(store.wallets[0])
+    this.app.get('/v1/mine-start', (req: Request, res: Response) => {
+      this.store.mining = true
+      this.bus.emit('mine-start')
+      if (! this.config.demoMode) this.miner.mine(this.store.wallets[0])
       res.json('Ok')
     })
 
     /*
      * Stop mining
      */
-    this.app.get('/v1/mine-stop', (req, res) => {
-      if (config.demoMode) return res.status(403).send('Can not stop miner in Demo mode')
-      store.mining = false
-      bus.emit('mine-stop')
+    this.app.get('/v1/mine-stop', (req: Request, res: Response) => {
+      if (this.config.demoMode) return res.status(403).send('Can not stop miner in Demo mode')
+      this.store.mining = false
+      this.bus.emit('mine-stop')
       res.json('Ok')
     })
 
-    this.http.listen(config.httpPort, config.httpHost, () => debug('Listening http on host: ' + config.httpHost + '; port: ' + config.httpPort))
-  },
-
-})
+    this.http.listen(this.config.httpPort, this.config.httpHost, () => debug('Listening http on host: ' + this.config.httpHost + '; port: ' + this.config.httpPort))
+  }
+}

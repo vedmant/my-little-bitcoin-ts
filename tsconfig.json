@@ -4,11 +4,14 @@
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "target": "es2017",
-    "lib": ["es2017"],
+    "lib": [
+      "es2017",
+      "webworker"
+    ],
     "noImplicitAny": true,
     "moduleResolution": "node",
     "sourceMap": true,
-    "outDir": "dist",
+    "outDir": "dist/node",
     "baseUrl": ".",
     "paths": {
       "*": [

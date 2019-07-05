@@ -2,34 +2,20 @@ import Bus from './bus';
 import { generateKeyPair, Wallet } from './lib/wallet'
 import { GeneralError, TransactionError } from './errors'
 import { isChainValid } from './lib/chain'
-import { checkBlock, makeGenesisBlock } from './lib/block'
-import { buildTransaction, checkTransaction } from './lib/transaction'
+import { Block, checkBlock, makeGenesisBlock } from './lib/block'
+import { buildTransaction, checkTransaction, Input, Output, Transaction } from './lib/transaction'
+import Debug from 'debug'
 
-const debug = require('debug')('app:store')
-
-
-
-
-
+const debug = Debug('app:store')
 
 export default class Store {
 
-  /* ========================================================================= *\
-   * State
-  \* ========================================================================= */
-
   bus: Bus
-
   difficulty: number // The less value the bigger difficulty
-
   chain: any[]
-
   mempool: Array<any> // This is pending transactions that will be added to the next block
-
   peers: Array<any> // List of peers ['ip:port']
-
   wallets: Wallet[]
-
   mining: boolean
 
   constructor(config: any, bus: Bus) {
@@ -68,8 +54,9 @@ export default class Store {
   }
 
   getTransactionsForAddress (address: string) {
-    return this.getTransactions(false).filter(tx => tx.inputs.find(i => i.address === address) ||
-      tx.outputs.find(o => o.address === address))
+    return this.getTransactions(false).filter(
+      (tx: Transaction) => tx.inputs.find(i => i.address === address)
+        || tx.outputs.find(o => o.address === address))
   }
 
   getTransactionsForNextBlock () {
@@ -85,30 +72,30 @@ export default class Store {
     const transactions = this.getTransactions(withMempool)
 
     // Find all inputs with their tx ids
-    const inputs = transactions.reduce((inputs, tx) => inputs.concat(tx.inputs), [])
+    const inputs = transactions.reduce((inputs: Input[], tx: Transaction) => inputs.concat(tx.inputs), [])
 
     // Find all outputs with their tx ids
-    const outputs = transactions.reduce((outputs, tx) =>
+    const outputs = transactions.reduce((outputs: Output[], tx: Transaction) =>
       outputs.concat(tx.outputs.map(o => Object.assign({}, o, {tx: tx.id}))), [])
 
     // Figure out which outputs are unspent
-    return outputs.filter(output =>
-      typeof inputs.find(input => input.tx === output.tx && input.index === output.index && input.amount === output.amount && input.address === output.address) === 'undefined')
+    return outputs.filter((output: Output) =>
+      typeof inputs.find((input: Input) => input.tx === output.tx && input.index === output.index && input.amount === output.amount && input.address === output.address) === 'undefined')
   }
 
   getUnspentForAddress (address: string) {
-    return this.getUnspent(true).filter(u => u.address === address)
+    return this.getUnspent(true).filter((u: Output) => u.address === address)
   }
 
   getBalanceForAddress (address: string) {
-    return this.getUnspentForAddress(address).reduce((acc, u) => acc + u.amount, 0)
+    return this.getUnspentForAddress(address).reduce((acc: number, u: Output) => acc + u.amount, 0)
   }
 
   /* ========================================================================= *\
    * Actions
   \* ========================================================================= */
 
-  addBlock (block) {
+  addBlock (block: Block) {
     checkBlock(this.lastBlock(), block, this.difficulty, this.getUnspent())
     this.chain.push(block) // Push block to the chain
     this.cleanMempool(block.transactions) // Clean mempool
@@ -116,7 +103,7 @@ export default class Store {
     return block
   }
 
-  addTransaction (transaction, byPeer = false) {
+  addTransaction (transaction: Transaction, byPeer = false) {
     checkTransaction(transaction, this.getUnspent(true))
     // TODO: check if transaction or any intputs are not in mempool already
     this.mempool.push(transaction)
@@ -125,7 +112,7 @@ export default class Store {
     else this.bus.emit('transaction-added-by-me', transaction)
 
     // Notify about new transaction if one of our wallets recieved funds
-    let myWallet
+    let myWallet: Wallet
     const outputToMyWallet = transaction.outputs.find(output => myWallet = this.wallets.find(w => w.public === output.address))
     if (myWallet && outputToMyWallet) {
       this.bus.emit('recieved-funds', {
@@ -138,18 +125,18 @@ export default class Store {
     debug('Added transaction to mempool ', transaction.id)
   }
 
-  addWallet (wallet) {
+  addWallet (wallet: Wallet) {
     this.wallets.push(wallet)
   }
 
-  cleanMempool (transactions) {
+  cleanMempool (transactions: Transaction[]) {
     transactions.forEach(tx => {
-      let index = this.mempool.findIndex(t => t.id === tx.id)
+      const index = this.mempool.findIndex(t => t.id === tx.id)
       if (index !== -1) this.mempool.splice(index, 1)
     })
   }
 
-  updateChain (newChain) {
+  updateChain (newChain: Block[]) {
     if (newChain.length > this.chain.length && isChainValid(newChain, this.difficulty)) {
       this.chain = newChain
       return true
@@ -158,17 +145,17 @@ export default class Store {
     return false
   }
 
-  addPeer (peer) {
-    this.peers.push(peer)
-  }
+  // addPeer (peer) {
+  //   this.peers.push(peer)
+  // }
 
-  send (from, toAddress, amount) {
+  send (from: string, toAddress: string, amount: number) {
     const wallet = this.wallets.find(w => w.public === from)
     if (! wallet) throw new GeneralError(`Wallet with address ${from} not found`)
     if (amount <= 0) throw new GeneralError(`Amount should be positive`)
 
     try {
-      const transaction = buildTransaction(wallet, toAddress, parseInt(amount), this.getUnspentForAddress(wallet.public))
+      const transaction = buildTransaction(wallet, toAddress, amount, this.getUnspentForAddress(wallet.public))
       this.addTransaction(transaction)
       this.bus.emit('balance-updated', {public: wallet.public, balance: this.getBalanceForAddress(wallet.public)})
       return 'Transaction added to pool: ' + transaction.id
