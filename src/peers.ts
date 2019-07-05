@@ -1,8 +1,10 @@
+import Bus from './bus';
+
 const debug = require('debug')('app:peers')
 const WebSocket = require('ws')
 const {BlockError, TransactionError} = require('./errors')
 
-module.exports = (config, bus, store) => ({
+export default (config: any, bus: Bus, store) => ({
 
   connections: store.peers.map(peer => ({url: peer, ws: null, timeoutId: null, retries: 0, initial: true})),
 

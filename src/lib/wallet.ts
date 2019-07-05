@@ -1,13 +1,23 @@
-const {randomBytes} = require('crypto')
-const secp256k1 = require('secp256k1')
-const bs58 = require('bs58')
+import { randomBytes } from 'crypto'
+import secp256k1 from 'secp256k1'
+import bs58 from 'bs58'
+
+export interface KeyPair {
+  private: string
+  public: string
+}
+
+export interface Wallet extends KeyPair {
+  name?: string
+}
+
 
 /**
  * Generate key pair
  *
  * @return {{private: string, public: string}}
  */
-function generateKeyPair () {
+export function generateKeyPair (): KeyPair {
   // Generate private key
   let privKey
   do {
@@ -30,7 +40,7 @@ function generateKeyPair () {
  * @param {string} hash
  * @return {string}
  */
-function signHash (privateKey, hash) {
+export function signHash (privateKey: string, hash: string): string {
   return secp256k1.sign(Buffer.from(hash, 'hex'), Buffer.from(privateKey, 'hex')).signature.toString('base64')
 }
 
@@ -42,8 +52,6 @@ function signHash (privateKey, hash) {
  * @param {string} hash
  * @return {bool}
  */
-function verifySignature (address, signature, hash) {
+export function verifySignature (address: string, signature: string, hash: string): boolean {
   return secp256k1.verify(Buffer.from(hash, 'hex'), Buffer.from(signature, 'base64'), bs58.decode(address))
 }
-
-module.exports = {generateKeyPair, signHash, verifySignature}

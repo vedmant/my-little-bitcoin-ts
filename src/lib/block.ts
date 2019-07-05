@@ -1,7 +1,17 @@
-const {BlockError} = require('../errors')
-const CryptoJS = require('crypto-js')
-const Joi = require('joi')
-const {checkTransactions, createRewardTransaction} = require('./transaction')
+import { BlockError } from '../errors'
+import CryptoJS from 'crypto-js'
+import Joi from 'joi'
+import { checkTransactions, createRewardTransaction, Output, Transaction } from './transaction'
+import { Wallet } from './wallet'
+
+export interface Block {
+  index: number
+  prevHash: string
+  time: number
+  transactions: Transaction[]
+  nonce: number
+  hash: string
+}
 
 const blockSchema = Joi.object().keys({
   index: Joi.number(), // Transaction index or height
@@ -18,7 +28,7 @@ const blockSchema = Joi.object().keys({
  * @param block
  * @return {*}
  */
-function isDataValid (block) {
+export function isDataValid (block: Block): boolean {
   return Joi.validate(block, blockSchema).error === null
 }
 
@@ -30,7 +40,7 @@ function isDataValid (block) {
  * @param difficulty
  * @param unspent
  */
-function checkBlock (previousBlock, block, difficulty, unspent) {
+export function checkBlock (previousBlock: Block, block: Block, difficulty: number, unspent: Output[]) {
   if (! isDataValid(block)) throw new BlockError('Invalid block data')
   const blockDifficulty = getDifficulty(block.hash)
   if (previousBlock.index + 1 !== block.index) throw new BlockError('Invalid block index')
@@ -45,7 +55,7 @@ function checkBlock (previousBlock, block, difficulty, unspent) {
  *
  * @param block
  */
-function calculateHash ({index, prevHash, time, transactions, nonce}) {
+export function calculateHash ({index, prevHash, time, transactions, nonce}) {
   return CryptoJS.SHA256(JSON.stringify({index, prevHash, time, transactions, nonce})).toString()
 }
 
@@ -54,7 +64,7 @@ function calculateHash ({index, prevHash, time, transactions, nonce}) {
  *
  * @return {{index: number, prevHash: string, time: number, transactions: Array, nonce: number}}
  */
-function makeGenesisBlock () {
+export function makeGenesisBlock () {
   const block = {
     index: 0,
     prevHash: '0',
@@ -75,7 +85,7 @@ function makeGenesisBlock () {
  * @param wallet {{private: string, public: string}}
  * @return {{index: number, prevHash, time: number, transactions: Array, nonce: number}}
  */
-function createBlock (transactions, lastBlock, wallet) {
+export function createBlock (transactions: Transaction[], lastBlock, wallet: Wallet) {
   transactions = transactions.slice()
   transactions.push(createRewardTransaction(wallet))
   const block = {
@@ -96,8 +106,6 @@ function createBlock (transactions, lastBlock, wallet) {
  * @param hash
  * @return {Number}
  */
-function getDifficulty (hash) {
+export function getDifficulty (hash: string): number {
   return parseInt(hash.substring(0, 8), 16)
 }
-
-module.exports = {checkBlock, calculateHash, makeGenesisBlock, createBlock, getDifficulty}

@@ -1,9 +1,11 @@
 require('dotenv').config()
-const Sentry = require('@sentry/node')
-global.debug = require('debug')('app:global')
-const config = require('./config')
-const bus = require('./bus')
-const store = require('./store')(config, bus)
+import Sentry from '@sentry/node'
+// global.debug = require('debug')('app:global')
+import config from './config'
+import bus from './bus'
+import storeFactory from './store'
+
+const store = storeFactory(config, bus)
 const miner = require('./miner')(config, bus, store)
 require('./server')(config, bus, store, miner).start()
 

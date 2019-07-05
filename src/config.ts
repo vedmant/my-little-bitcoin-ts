@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   httpPort: process.env.HTTP_PORT || 3001,
   httpHost: process.env.HTTP_HOST || 'localhost',
   p2pPort: process.env.P2P_PORT || 6001,

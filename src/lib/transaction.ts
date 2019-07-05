@@ -1,9 +1,34 @@
-const {TransactionError} = require('../errors')
-const CryptoJS = require('crypto-js')
-const crypto = require('crypto')
-const Joi = require('joi')
-const walletLib = require('./wallet')
-const {miningReward} = require('../config')
+import { TransactionError } from '../errors'
+import CryptoJS from 'crypto-js'
+import crypto from 'crypto'
+import Joi from 'joi'
+import * as walletLib from './wallet'
+import config from '../config'
+
+export interface Input {
+  tx: string
+  index: number
+  amount: number
+  address: string
+  signature: string
+}
+
+export interface Output {
+  index: number
+  amount: number
+  address: string
+}
+
+export interface Transaction {
+  id: string
+  time: number,
+  reward: boolean
+  address: string
+  hash: string
+  signature: string
+  inputs: Input[]
+  outputs: Output[]
+}
 
 const transactionSchema = Joi.object().keys({
   id: Joi.string().hex().length(64), // Transaction unique id
@@ -34,7 +59,7 @@ const transactionSchema = Joi.object().keys({
  * @param transaction
  * @return {*}
  */
-function isDataValid (transaction) {
+export function isDataValid (transaction: Transaction): boolean {
   return Joi.validate(transaction, transactionSchema).error === null
 }
 
@@ -44,7 +69,7 @@ function isDataValid (transaction) {
  * @param transactions
  * @param unspent
  */
-function checkTransactions (transactions, unspent) {
+export function checkTransactions (transactions: Transaction[], unspent: Output[]) {
   transactions.forEach(tx => checkTransaction(tx, unspent))
   if (transactions.filter(tx => tx.reward).length !== 1) throw new TransactionError('Transactions must have exactly one reward transaction')
 }
@@ -55,7 +80,7 @@ function checkTransactions (transactions, unspent) {
  * @param transaction
  * @param unspent
  */
-function checkTransaction (transaction, unspent) {
+export function checkTransaction (transaction: Transaction, unspent: Output[]) {
   if (! isDataValid(transaction)) throw new TransactionError('Transaction data is not valid')
   if (transaction.hash !== calculateHash(transaction)) throw new TransactionError('Invalid transaction hash')
   if (! verifyTransactionSignature(transaction)) throw new TransactionError('Invalid transaction signature')
@@ -79,7 +104,7 @@ function checkTransaction (transaction, unspent) {
   if (transaction.reward) {
     // For reward transaction: check if reward output is correct
     if (transaction.outputs.length !== 1) throw new TransactionError('Reward transaction must have exactly one output')
-    if (transaction.outputs[0].amount !== miningReward) throw new TransactionError(`Mining reward must be exactly: ${miningReward}`)
+    if (transaction.outputs[0].amount !== config.miningReward) throw new TransactionError(`Mining reward must be exactly: ${miningReward}`)
   } else {
     // For normal transaction: check if total output amount equals input amount
     if (transaction.inputs.reduce((acc, input) => acc + input.amount, 0) !== transaction.outputs.reduce((acc, output) => acc + output.amount, 0)) {
@@ -96,7 +121,7 @@ function checkTransaction (transaction, unspent) {
  * @param input
  * @return {*}
  */
-function verifyInputSignature (input) {
+export function verifyInputSignature (input) {
   return walletLib.verifySignature(input.address, input.signature, calculateInputHash(input))
 }
 
@@ -106,7 +131,7 @@ function verifyInputSignature (input) {
  * @param transaction
  * @return {*}
  */
-function verifyTransactionSignature (transaction) {
+export function verifyTransactionSignature (transaction) {
   return walletLib.verifySignature(transaction.address, transaction.signature, transaction.hash)
 }
 
@@ -115,7 +140,7 @@ function verifyTransactionSignature (transaction) {
  *
  * @param transaction
  */
-function calculateHash ({id, time, address, reward, inputs, outputs}) {
+export function calculateHash ({id, time, address, reward, inputs, outputs}) {
   return CryptoJS.SHA256(JSON.stringify({id, time, address, reward, inputs, outputs})).toString()
 }
 
@@ -124,7 +149,7 @@ function calculateHash ({id, time, address, reward, inputs, outputs}) {
  *
  * @param input
  */
-function calculateInputHash ({tx, index, amount, address}) {
+export function calculateInputHash ({tx, index, amount, address}) {
   return CryptoJS.SHA256(JSON.stringify({tx, index, amount, address})).toString()
 }
 
@@ -137,8 +162,8 @@ function calculateInputHash ({tx, index, amount, address}) {
  * @param wallet
  * @return {{tx: string, index: number, amount: number, address: string}}
  */
-function createInput (tx, index, amount, wallet) {
-  const input = {
+export function createInput (tx: string, index: number, amount: number, wallet) {
+  const input: Input = {
     tx,
     index,
     amount,
@@ -158,8 +183,8 @@ function createInput (tx, index, amount, wallet) {
  * @param {boolean} reward
  * @return {{id: string, reward: boolean, inputs: Array, outputs: Array, hash: string}}
  */
-function createTransaction (wallet, inputs, outputs, reward = false) {
-  const tx = {
+export function createTransaction (wallet, inputs: Input[], outputs: Output[], reward = false) {
+  const tx: Transaction = {
     id: crypto.randomBytes(32).toString('hex'),
     time: Math.floor(new Date().getTime() / 1000),
     reward,
@@ -179,7 +204,7 @@ function createTransaction (wallet, inputs, outputs, reward = false) {
  * @param {{public: string, private: string}} wallet
  * @return {{id: string, reward: boolean, inputs: Array, outputs: Array, hash: string}}
  */
-function createRewardTransaction (wallet) {
+export function createRewardTransaction (wallet) {
   return createTransaction(wallet, [], [{index: 0, amount: miningReward, address: wallet.public}], true)
 }
 
@@ -192,7 +217,7 @@ function createRewardTransaction (wallet) {
  * @param {Array} unspent
  * @return {{id: string, reward: boolean, inputs: Array, outputs: Array, hash: string}}
  */
-function buildTransaction (wallet, toAddress, amount, unspent) {
+export function buildTransaction (wallet, toAddress, amount, unspent) {
   let inputsAmount = 0
   const inputsRaw = unspent.filter(i => {
     const more = inputsAmount < amount
@@ -211,13 +236,4 @@ function buildTransaction (wallet, toAddress, amount, unspent) {
   }
 
   return createTransaction(wallet, inputs, outputs)
-}
-
-module.exports = {
-  isDataValid,
-  checkTransactions,
-  checkTransaction,
-  calculateHash,
-  createRewardTransaction,
-  buildTransaction,
 }

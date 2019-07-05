@@ -1,32 +1,51 @@
-const debug = require('debug')('app:store')
-const {TransactionError, GeneralError} = require('./errors')
-const {isChainValid} = require('./lib/chain')
-const {checkBlock, makeGenesisBlock} = require('./lib/block')
-const {checkTransaction, buildTransaction} = require('./lib/transaction')
-const {generateKeyPair} = require('./lib/wallet')
+import Bus from './bus';
+import { generateKeyPair, Wallet } from './lib/wallet'
+import { GeneralError, TransactionError } from './errors'
+import { isChainValid } from './lib/chain'
+import { checkBlock, makeGenesisBlock } from './lib/block'
+import { buildTransaction, checkTransaction } from './lib/transaction'
 
-module.exports = (config, bus) => ({
+const debug = require('debug')('app:store')
+
+
+
+
+
+
+export default class Store {
 
   /* ========================================================================= *\
    * State
   \* ========================================================================= */
 
-  difficulty: config.demoMode ? 100000000 : 10000 * 1, // The less value the bigger difficulty
+  bus: Bus
 
-  chain: [makeGenesisBlock()],
+  difficulty: number // The less value the bigger difficulty
 
-  mempool: [], // This is pending transactions that will be added to the next block
+  chain: any[]
 
-  peers: config.initialPeers, // List of peers ['ip:port']
+  mempool: Array<any> // This is pending transactions that will be added to the next block
 
-  wallets: [
-    {name: 'Main', ...generateKeyPair()},
-    {name: 'Wallet 1', ...generateKeyPair()},
-    {name: 'Wallet 2', ...generateKeyPair()},
-    {name: 'Wallet 3', ...generateKeyPair()},
-  ],
+  peers: Array<any> // List of peers ['ip:port']
 
-  mining: !! config.demoMode,
+  wallets: Wallet[]
+
+  mining: boolean
+
+  constructor(config: any, bus: Bus) {
+    this.bus = bus
+    this.difficulty = config.demoMode ? 100000000 : 10000 * 1
+    this.chain = [makeGenesisBlock()]
+    this.mempool = []
+    this.peers = config.initialPeers
+    this.wallets = [
+      {name: 'Main', ...generateKeyPair()},
+      {name: 'Wallet 1', ...generateKeyPair()},
+      {name: 'Wallet 2', ...generateKeyPair()},
+      {name: 'Wallet 3', ...generateKeyPair()},
+    ]
+    this.mining =  !! config.demoMode
+  }
 
   /* ========================================================================= *\
    * Getters
@@ -34,24 +53,24 @@ module.exports = (config, bus) => ({
 
   lastBlock () {
     return this.chain[this.chain.length - 1]
-  },
+  }
 
-  blocksAfter (index) {
+  blocksAfter (index: number) {
     if (index >= this.chain.length) return []
     return this.chain.slice(index)
-  },
+  }
 
   getTransactions (withMempool = true) {
     let transactions = this.chain.reduce((transactions, block) => transactions.concat(block.transactions), [])
     if (withMempool) transactions = transactions.concat(this.mempool)
 
     return transactions
-  },
+  }
 
-  getTransactionsForAddress (address) {
+  getTransactionsForAddress (address: string) {
     return this.getTransactions(false).filter(tx => tx.inputs.find(i => i.address === address) ||
       tx.outputs.find(o => o.address === address))
-  },
+  }
 
   getTransactionsForNextBlock () {
     const unspent = this.getUnspent(false)
@@ -60,7 +79,7 @@ module.exports = (config, bus) => ({
         return checkTransaction(tx, unspent)
       } catch (e) { if (! (e instanceof TransactionError)) throw e }
     })
-  },
+  }
 
   getUnspent (withMempool = false) {
     const transactions = this.getTransactions(withMempool)
@@ -75,15 +94,15 @@ module.exports = (config, bus) => ({
     // Figure out which outputs are unspent
     return outputs.filter(output =>
       typeof inputs.find(input => input.tx === output.tx && input.index === output.index && input.amount === output.amount && input.address === output.address) === 'undefined')
-  },
+  }
 
-  getUnspentForAddress (address) {
+  getUnspentForAddress (address: string) {
     return this.getUnspent(true).filter(u => u.address === address)
-  },
+  }
 
-  getBalanceForAddress (address) {
+  getBalanceForAddress (address: string) {
     return this.getUnspentForAddress(address).reduce((acc, u) => acc + u.amount, 0)
-  },
+  }
 
   /* ========================================================================= *\
    * Actions
@@ -95,21 +114,21 @@ module.exports = (config, bus) => ({
     this.cleanMempool(block.transactions) // Clean mempool
     debug(`Added block ${block.index} to the chain`)
     return block
-  },
+  }
 
   addTransaction (transaction, byPeer = false) {
     checkTransaction(transaction, this.getUnspent(true))
     // TODO: check if transaction or any intputs are not in mempool already
     this.mempool.push(transaction)
 
-    if (byPeer) bus.emit('transaction-added', transaction)
-    else bus.emit('transaction-added-by-me', transaction)
+    if (byPeer) this.bus.emit('transaction-added', transaction)
+    else this.bus.emit('transaction-added-by-me', transaction)
 
     // Notify about new transaction if one of our wallets recieved funds
-    let myWallet = null
+    let myWallet
     const outputToMyWallet = transaction.outputs.find(output => myWallet = this.wallets.find(w => w.public === output.address))
-    if (outputToMyWallet) {
-      bus.emit('recieved-funds', {
+    if (myWallet && outputToMyWallet) {
+      this.bus.emit('recieved-funds', {
         name: myWallet.name,
         public: myWallet.public,
         amount: outputToMyWallet.amount,
@@ -117,18 +136,18 @@ module.exports = (config, bus) => ({
       })
     }
     debug('Added transaction to mempool ', transaction.id)
-  },
+  }
 
   addWallet (wallet) {
     this.wallets.push(wallet)
-  },
+  }
 
   cleanMempool (transactions) {
     transactions.forEach(tx => {
       let index = this.mempool.findIndex(t => t.id === tx.id)
       if (index !== -1) this.mempool.splice(index, 1)
     })
-  },
+  }
 
   updateChain (newChain) {
     if (newChain.length > this.chain.length && isChainValid(newChain, this.difficulty)) {
@@ -137,11 +156,11 @@ module.exports = (config, bus) => ({
     }
 
     return false
-  },
+  }
 
   addPeer (peer) {
     this.peers.push(peer)
-  },
+  }
 
   send (from, toAddress, amount) {
     const wallet = this.wallets.find(w => w.public === from)
@@ -151,12 +170,12 @@ module.exports = (config, bus) => ({
     try {
       const transaction = buildTransaction(wallet, toAddress, parseInt(amount), this.getUnspentForAddress(wallet.public))
       this.addTransaction(transaction)
-      bus.emit('balance-updated', {public: wallet.public, balance: this.getBalanceForAddress(wallet.public)})
+      this.bus.emit('balance-updated', {public: wallet.public, balance: this.getBalanceForAddress(wallet.public)})
       return 'Transaction added to pool: ' + transaction.id
     } catch (e) {
       if (! (e instanceof TransactionError)) throw e
       console.error(e)
       throw new GeneralError(e.message)
     }
-  },
-})
+  }
+}
