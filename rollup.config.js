@@ -1,78 +1,61 @@
-import fs from 'fs'
-import vue from 'rollup-plugin-vue'
-import copy from 'rollup-plugin-copy'
-import scss from 'rollup-plugin-scss'
-import serve from 'rollup-plugin-serve'
-import buble from 'rollup-plugin-buble'
-import uglify from 'rollup-plugin-uglify'
-import cssnano from 'cssnano'
-import postcss from 'postcss'
-import replace from 'rollup-plugin-replace'
+import svelte from 'rollup-plugin-svelte'
+import resolve from 'rollup-plugin-node-resolve'
 import commonjs from 'rollup-plugin-commonjs'
+import {terser} from 'rollup-plugin-terser'
+import scss from 'rollup-plugin-scss'
+import html from 'rollup-plugin-fill-html'
+import path from 'path'
+import serve from 'rollup-plugin-serve'
 import livereload from 'rollup-plugin-livereload'
-import nodeResolve from 'rollup-plugin-node-resolve'
-import nodeGlobals from 'rollup-plugin-node-globals'
-import babel from 'rollup-plugin-babel'
-import json from 'rollup-plugin-json'
-import autoprefixer from 'autoprefixer'
+import assetSync from 'rollup-plugin-asset-sync'
 
-if(fs.existsSync('./dist/app.js.map')) fs.unlinkSync('./dist/app.js.map')
+const production = !process.env.ROLLUP_WATCH
 
-let plugins = [
-   babel({
-      exclude: 'node_modules/**',
-      runtimeHelpers: true,
-   }),
-   json(),
-   // alias({ vue$: 'vue/dist/vue.common.js' }),
-   vue({autoStyles: false, styleToImports: true}),
-   scss({
-      output: 'dist/app.css',
-      processor: css => postcss([autoprefixer, cssnano]).process(css, {from: undefined}).then(result => result.css)
-   }),
-   buble({
-      objectAssign: 'Object.assign',
-      transforms: {
-         dangerousForOf: true,
-      },
-   }),
-   nodeResolve({
-      jsnext: true,
-      main: true,
-      browser: true
-   }),
-   commonjs(),
-   nodeGlobals(),
-   copy({targets: {src: 'client/index.html', dest: 'dist'}}),
+const buildDir = 'public'
 
-   process.env.NODE_ENV === 'prod' && replace({'process.env.NODE_ENV': JSON.stringify('production')}),
-   process.env.NODE_ENV === 'prod' && uglify(),
-   process.env.NODE_ENV !== 'prod' && process.env.PORT !== undefined && livereload(),
-   process.env.PORT !== undefined && serve({
-      contentBase: './dist/',
-      port: process.env.PORT,
-      open: true
-   }),
-]
-
-let config = {
-   input: 'client/app.js',
+export default {
+   input: path.join(__dirname, 'front', 'index.js'),
    output: {
-      dir: 'dist',
-      format: 'cjs',
-      sourcemap: process.env.NODE_ENV !== 'prod'
+      sourcemap: true,
+      format: 'iife',
+      name: 'myapp',
+      file: path.join(__dirname, buildDir, 'main.js')
    },
-   manualChunks: {
-      'vendor': [
-         'vue',
-         'vue-router',
-         'vuex',
-         'moment-mini',
-         'jquery',
-         'axios',
-      ]
-   },
-   plugins: plugins,
+   plugins: [
+      assetSync({
+         input: path.join(__dirname, 'front', 'assets'),
+         output: path.join(__dirname, buildDir, 'assets')
+      }),
+      scss({
+         output: path.join(__dirname, buildDir, 'main.css'),
+         outputStyle: production ? 'compressed' : 'expanded'
+      }),
+      svelte({
+         // skipIntroByDefault: true,
+         // nestedTransitions: true,
+         dev: !production,
+         emitCss: true,
+         preprocess: require('svelte-preprocess')({
+            transformers: {
+               scss: true,
+            }
+         })
+      }),
+      html({
+         template: path.join(__dirname, 'front', 'index.html'),
+         filename: 'index.html'
+      }),
+      resolve(),
+      commonjs(),
+      (production && terser()),
+      (!production && serve({
+         contentBase: path.join(__dirname, buildDir),
+         historyApiFallback: true,
+         host: 'localhost',
+         port: 8080,
+      })),
+      (!production && livereload({
+         watch: path.join(__dirname, buildDir)
+      }))
+   ]
 }
-
-export default config

@@ -71,7 +71,7 @@ export default class Server {
     })]}))
 
     // Serve static files
-    this.app.use('/', express.static(path.resolve(__dirname, '../dist')))
+    this.app.use('/', express.static(path.resolve(__dirname, '../public')))
 
     /*
      * Get short blockchain status
