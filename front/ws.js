@@ -1,7 +1,7 @@
 import io from 'socket.io-client'
 import * as store from './store'
 
-const socket = io('http://localhost:3001')
+const socket = io('http://localhost:3001') // TODO add config
 
 socket.on('block-added', (block) => {
   store.addBlock(block)

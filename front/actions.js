@@ -1,16 +1,12 @@
 import axios from 'axios'
 import * as store from './store'
 
-axios.defaults.baseURL = 'http://localhost:3001/'
-axios.interceptors.response.use(function (response) {
-  // Do something with response data
-  return response
-}, function (error) {
+axios.defaults.baseURL = 'http://localhost:3001/' // TODO put to config
+axios.interceptors.response.use((response) => response, (error) => {
   // store.dispatch('addToastMessage', {type: 'danger', text: error.response.data})
   // store.commit('ERROR', error)
   return Promise.reject(error)
 })
-
 
 export const getStatus = async () => {
   store.loading.set(true)
@@ -31,4 +27,46 @@ export const stopMine = async () => {
 
 export const startMine = async () => {
   await axios.get('/v1/mine-start')
+}
+
+export const getBlock = async (index) => {
+  store.loading.set(true)
+  const resp = await axios.get('/v1/block/' + index)
+  store.loading.set(false)
+  store.block.set(resp.data.block)
+}
+
+export const getAddress = async (address) => {
+  store.loading.set(true)
+  const resp = await axios.get('/v1/address/' + address)
+  store.loading.set(false)
+  store.address.set(resp.data)
+}
+
+export const getTransaction = async (id) => {
+  store.loading.set(true)
+  const resp = await axios.get('/v1/transaction/' + id)
+  store.loading.set(false)
+  store.transaction.set(resp.data)
+}
+
+export const getWallets = async () => {
+  store.loading.set(true)
+  const resp = await axios.get('/v1/wallets')
+  store.loading.set(false)
+  store.wallets.set(resp.data)
+}
+
+export const createWallet = async (name) => {
+  store.loading.set(true)
+  const resp = await axios.post('/v1/wallet/create', { name })
+  store.loading.set(false)
+  store.wallets.update(w => {
+    w.push(resp.data)
+    return w
+  })
+}
+
+export const sendFunds = async ({ from, to, amount }) => {
+  await axios.get(`/v1/send/${from}/${to}/${amount}`)
 }

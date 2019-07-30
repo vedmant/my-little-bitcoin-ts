@@ -29,6 +29,7 @@
   <div class="container">
     <Route path="/" component="{Status}" />
     <Route path="wallets" component="{Wallets}" />
+    <Route path="block/:id" component="{Block}" />
   </div>
 </Router>
 
@@ -36,6 +37,7 @@
 import {Router, Route, link} from 'svelte-routing'
 import Wallets from './components/Wallets.svelte'
 import Status from './components/Status.svelte'
+import Block from './components/Block.svelte'
 import { onMount } from 'svelte'
 import { loading } from './store'
 import { getStatus } from './actions'

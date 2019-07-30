@@ -1,4 +1,4 @@
-import { writable } from 'svelte/store'
+import { writable, derived } from 'svelte/store'
 
 export const loading = writable(false)
 export const mining = writable(false)
@@ -9,9 +9,28 @@ export const mempool = writable([])
 export const wallets = writable([])
 export const stats = writable([])
 export const block = writable({})
+export const address = writable({})
 export const transaction = writable({ transaction: { inputs: [], outputs: [] }, block: {} })
 
-export const test = writable('qwe')
+/*
+ * Getters
+ */
+
+export const blockOutput = derived(block, $block => {
+  if (!$block.transactions || !$block.transactions.length) return ''
+
+  return $block.transactions.reduce((acc, tx) => acc + tx.outputs.reduce((acc, out) => acc + out.amount, 0), 0)
+})
+
+export const blockReward = derived(block, $block => {
+  if (!$block.transactions || !$block.transactions.length) return ''
+
+  return $block.transactions.find(tx => tx.reward).outputs[0].amount
+})
+
+/*
+ * Actions
+ */
 
 export const addBlock = (block) => {
   chain.update(c => {
