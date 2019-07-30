@@ -1,6 +1,8 @@
 //All globals styles should be imported there. I.e. any CSS frameworks or something like this.
 import './scss/index.scss'
 import App from './App.svelte'
+import './ws'
+import 'jquery'
 
 const app = new App({
   target: document.getElementById('app'),

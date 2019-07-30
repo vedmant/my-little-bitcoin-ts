@@ -10,4 +10,3 @@ export function isChainValid (chain: Block[], difficulty: number) {
 
   return true
 }
-

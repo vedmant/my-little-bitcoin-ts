@@ -24,19 +24,25 @@
     </div>
   </nav>
 
+  {$loading ? 'Loading...' : ''}
+
   <div class="container">
-    <Route path="/" component={Home} />
-    <Route path="about" component={About} />
+    <Route path="/" component="{Status}" />
+    <Route path="wallets" component="{Wallets}" />
   </div>
 </Router>
 
-{url}
-
 <script>
-import { Router, Route, link } from 'svelte-routing'
-import Navbar from './components/Navbar.svelte'
-import About from './components/About.svelte'
-import Home from './components/Home.svelte'
+import {Router, Route, link} from 'svelte-routing'
+import Wallets from './components/Wallets.svelte'
+import Status from './components/Status.svelte'
+import { onMount } from 'svelte'
+import { loading } from './store'
+import { getStatus } from './actions'
 
-export let url = '/'
+onMount(() => {
+  getStatus()
+})
+
+export let url = ''
 </script>

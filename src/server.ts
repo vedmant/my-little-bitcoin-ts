@@ -13,6 +13,7 @@ import Miner from './miner'
 import Store from './store'
 import { Block } from './lib/block'
 import { Input, Output, Transaction } from './lib/transaction'
+import cors from 'cors'
 
 const debug = Debug('app:server')
 
@@ -72,6 +73,8 @@ export default class Server {
 
     // Serve static files
     this.app.use('/', express.static(path.resolve(__dirname, '../public')))
+
+    this.app.use(cors())
 
     /*
      * Get short blockchain status
