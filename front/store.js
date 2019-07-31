@@ -11,6 +11,7 @@ export const stats = writable([])
 export const block = writable({})
 export const address = writable({})
 export const transaction = writable({ transaction: { inputs: [], outputs: [] }, block: {} })
+export const toasts = writable([])
 
 /*
  * Getters
@@ -30,7 +31,7 @@ export const blockReward = derived(block, $block => {
 
 
 /*
- * Actions
+ * Setters
  */
 
 export const addBlock = (block) => {
@@ -62,5 +63,40 @@ export const updateBalance = (balance) => {
     wlts[index].balance = balance.balance
 
     return wlts
+  })
+}
+
+let maxToastId = 0
+
+export const addToast = (toast) => {
+  toast = {
+    id: maxToastId++,
+    text: 'Text',
+    type: 'info',
+    dismissAfter: 5000,
+    ...toast
+  }
+
+  toasts.update(msgs => {
+    msgs.push(toast)
+    return msgs
+  })
+
+  setTimeout(() => {
+    toasts.update(msgs => {
+      return msgs.filter(m => m.id !== toast.id)
+    })
+  }, toast.dismissAfter)
+}
+
+export const recievedFunds = (data) => {
+  wallets.update($wallets => {
+    const index = $wallets.get().findIndex(w => w.public === data.public)
+    if (index === -1) {
+      console.error('Cant find wallet to update balance')
+      return $wallets
+    }
+    $wallets[index].balance = data.balance
+    return $wallets
   })
 }

@@ -1,3 +1,5 @@
+<Spinner/>
+<Toast/>
 
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
   <a class="navbar-brand" href="/" use:link>My Little Bitcoin</a>
@@ -23,8 +25,6 @@
   </div>
 </nav>
 
-{$loading ? 'Loading...' : ''}
-
 <div class="container">
   <Router {routes}/>
 </div>
@@ -32,12 +32,15 @@
 <script>
 import Router, {link} from 'svelte-spa-router'
 import active from 'svelte-spa-router/active'
+import Spinner from './components/Spinner.svelte'
+import Toast from './components/Toast.svelte'
 import Wallets from './components/Wallets.svelte'
 import Status from './components/Status.svelte'
 import Block from './components/Block.svelte'
 import Address from './components/Address.svelte'
+import NotFound from './components/404.svelte'
 import { onMount } from 'svelte'
-import { loading } from './store'
+import { loading, addToast } from './store'
 import { getStatus } from './actions'
 
 onMount(() => {
@@ -51,5 +54,6 @@ const routes = {
   '/wallets': Wallets,
   '/block/:id': Block,
   '/address/:id': Address,
+  '*': NotFound,
 }
 </script>
