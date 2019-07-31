@@ -17,16 +17,17 @@ export const transaction = writable({ transaction: { inputs: [], outputs: [] }, 
  */
 
 export const blockOutput = derived(block, $block => {
-  if (!$block.transactions || !$block.transactions.length) return ''
+  if (!$block.transactions || !$block.transactions.length) return 0
 
   return $block.transactions.reduce((acc, tx) => acc + tx.outputs.reduce((acc, out) => acc + out.amount, 0), 0)
 })
 
 export const blockReward = derived(block, $block => {
-  if (!$block.transactions || !$block.transactions.length) return ''
+  if (!$block.transactions || !$block.transactions.length) return 0
 
   return $block.transactions.find(tx => tx.reward).outputs[0].amount
 })
+
 
 /*
  * Actions

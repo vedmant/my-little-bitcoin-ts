@@ -10,6 +10,8 @@ import livereload from 'rollup-plugin-livereload'
 import assetSync from 'rollup-plugin-asset-sync'
 import json from 'rollup-plugin-json'
 import nodeResolve from 'rollup-plugin-node-resolve'
+import builtins from 'rollup-plugin-node-builtins'
+import globals from 'rollup-plugin-node-globals'
 
 const production = !process.env.ROLLUP_WATCH
 
@@ -24,6 +26,7 @@ export default {
     file: path.join(__dirname, buildDir, 'main.js')
   },
   plugins: [
+    commonjs(),
     assetSync({
       input: path.join(__dirname, 'front', 'assets'),
       output: path.join(__dirname, buildDir, 'assets')
@@ -49,8 +52,9 @@ export default {
     }),
     json(),
     nodeResolve({ jsnext: true, preferBuiltins: true, browser: true }),
+    builtins(),
+    globals(),
     resolve(),
-    commonjs(),
     (production && terser()),
     (!production && serve({
       contentBase: path.join(__dirname, buildDir),

@@ -26,7 +26,7 @@
       </tr>
       {#each chainReversed as block}
         <tr>
-          <td><a href="{ 'block/' + block.index }" use:link>{ block.index }</a></td>
+          <td><a href="{ '/block/' + block.index }" use:link>{ block.index }</a></td>
           <td>{ moment(block.time * 1000).from($time * 1000) }</td>
           <td>{ block.transactions.length }</td>
           <td>{ totalOutput(block) }</td>
@@ -46,7 +46,7 @@
           {#if mempool.length}
             {#each chain as block}
               <div class="list-group-item">
-                <a href="{ 'transaction/' + tx.id }" use:link>{ getTransactionMessage(tx) }</a>
+                <a href="{ '/transaction/' + tx.id }" use:link>{ getTransactionMessage(tx) }</a>
               </div>
             {/each}
           {:else}
@@ -63,7 +63,7 @@
         <div class="list-group list-group-flush">
           {#each $wallets as wallet}
             <div class="list-group-item">
-              <a href="{ 'address/' + wallet.public }" use:link>{ wallet.name }: { wallet.public }</a>
+              <a href="{ '/address/' + wallet.public }" use:link>{ wallet.name }: { wallet.public }</a>
               <div>Balance: { wallet.balance } MLB</div>
             </div>
           {/each}
@@ -83,7 +83,7 @@
 
 <script>
 import moment from 'moment-mini'
-import {link} from 'svelte-routing'
+import {link} from 'svelte-spa-router'
 import {wallets, chain, mempool, block, mining, time} from '../store'
 import {startMine, stopMine} from '../actions'
 import SendForm from './partials/SendForm.svelte'

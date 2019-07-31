@@ -44,11 +44,11 @@
             <tbody>
             <tr>
               <td>Hash</td>
-              <td class="smaller"><router-link :to="'/block/' + block.index">{ $block.hash }</router-link></td>
+              <td class="smaller"><a href={'/block/' + $block.index} use:link>{ $block.hash }</a></td>
             </tr>
             <tr>
               <td>Previous Block</td>
-              <td class="smaller"><router-link :to="'/block/' + (block.index - 1)">{ $block.prevHash }</router-link></td>
+              <td class="smaller"><a href={'/block/' + ($block.index - 1)} use:link>{ $block.prevHash }</a></td>
             </tr>
             </tbody>
           </table>
@@ -64,14 +64,15 @@
 
 <script>
 import moment from 'moment-mini'
+import {link} from 'svelte-spa-router'
 import { onMount } from 'svelte'
 import Transactions from './partials/Transactions.svelte'
 import {block, blockOutput, blockReward} from '../store'
 import {getBlock} from '../actions'
 
-export let id
+export let params = {}
 
 onMount(() => {
-  getBlock(id)
+  getBlock(params.id)
 })
 </script>
