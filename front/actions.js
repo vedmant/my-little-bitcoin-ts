@@ -3,8 +3,7 @@ import * as store from './store'
 
 axios.defaults.baseURL = 'http://localhost:3001/' // TODO put to config
 axios.interceptors.response.use((response) => response, (error) => {
-  // store.dispatch('addToastMessage', {type: 'danger', text: error.response.data})
-  // store.commit('ERROR', error)
+  store.addToast({ type: 'error', text: error.response.data })
   return Promise.reject(error)
 })
 

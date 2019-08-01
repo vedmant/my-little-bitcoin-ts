@@ -72,7 +72,5 @@ import {getBlock} from '../actions'
 
 export let params = {}
 
-onMount(() => {
-  getBlock(params.id)
-})
+$: getBlock(params.id)
 </script>

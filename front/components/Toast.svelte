@@ -1,8 +1,8 @@
-<div style="position: fixed; z-index: 99999; right: 20px; top: 20px;">
+<div style="position: fixed; z-index: 99999; left: 20px; top: 20px;">
   {#each $toasts as message (message.id)}
-    <div class="toast show" data-id={message.id} transition:fade|local>
+    <div class={'toast show ' + (message.type === 'error' ? 'error' : '')} data-id={message.id} transition:fade|local>
       <div class="toast-header">
-        <strong class="mr-auto text-primary">Notification</strong>
+        <strong class="mr-auto text-primary">{ message.type === 'error' ? 'Error' : 'Info'}</strong>
         <button type="button" class="ml-2 mb-1 close" on:click={() => remove(message.id)}>&times;</button>
       </div>
       <div class="toast-body">

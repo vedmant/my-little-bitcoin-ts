@@ -62,3 +62,8 @@ a, button, .btn {
   // line-height: ensure proper height of button next to extra small input
   @include button-size(0.2rem, 0.4rem, 0.8rem, 0.8rem, $border-radius);
 }
+
+.toast.error .toast-header {
+  background-color: red;
+  strong { color: white !important; }
+}

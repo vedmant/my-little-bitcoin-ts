@@ -4,15 +4,15 @@
       {#each transactions as tx}
         <tbody>
         <tr>
-          <td><a href={'/transaction/' + tx.id} use:link>{ tx.id }}</a></td>
+          <td><a href={'/transaction/' + tx.id} use:link>{ tx.id }</a></td>
           <td></td>
-          <td class="text-right">{ moment(tx.time * 1000).format('YYYY-MM-DD h:mm:ss a') }}</td>
+          <td class="text-right">{ moment(tx.time * 1000).format('YYYY-MM-DD h:mm:ss a') }</td>
         </tr>
         <tr>
           <td>
             {#each tx.inputs as input}
               <div>
-                <a href={'/address/' + input.address} use:link>{ input.address }}</a>
+                <a href={'/address/' + input.address} use:link>{ input.address }</a>
                 - ({ input.amount } MLB - <a href={'/transaction/' + input.tx} use:link>Output</a>)
               </div>
             {/each}
@@ -26,8 +26,8 @@
           <td>
             {#each tx.outputs as output}
               <div>
-                <div class="pull-right">{ output.amount }} MLB</div>
-                <a href={'/address/' + output.address}>{ output.address }}</a>
+                <div class="pull-right">{ output.amount } MLB</div>
+                <a href={'/address/' + output.address} use:link>{ output.address }</a>
               </div>
             {/each}
           </td>

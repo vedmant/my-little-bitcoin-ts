@@ -29,6 +29,10 @@ export const blockReward = derived(block, $block => {
   return $block.transactions.find(tx => tx.reward).outputs[0].amount
 })
 
+export const lastBlock = derived(chain, $chain => {
+  return $chain[$chain.length - 1]
+})
+
 
 /*
  * Setters
@@ -43,6 +47,14 @@ export const addBlock = (block) => {
   })
 
   cleanMempool(block.transactions)
+}
+
+export const addTransaction = (tx) => {
+  mempool.update($mempool => {
+    $mempool.push(tx)
+
+    return $mempool
+  })
 }
 
 export const cleanMempool = (transactions) => {
@@ -91,7 +103,7 @@ export const addToast = (toast) => {
 
 export const recievedFunds = (data) => {
   wallets.update($wallets => {
-    const index = $wallets.get().findIndex(w => w.public === data.public)
+    const index = $wallets.findIndex(w => w.public === data.public)
     if (index === -1) {
       console.error('Cant find wallet to update balance')
       return $wallets

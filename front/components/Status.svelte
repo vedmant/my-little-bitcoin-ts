@@ -43,10 +43,10 @@
       <div class="card mb-5">
         <div class="card-header"><strong>Mempool</strong></div>
         <div class="list-group list-group-flush">
-          {#if mempool.length}
-            {#each chain as block}
+          {#if $mempool.length}
+            {#each $mempool as tx}
               <div class="list-group-item">
-                <a href="{ '/transaction/' + tx.id }" use:link>{ getTransactionMessage(tx) }</a>
+                <a href="{ '/transaction/' + tx.id }" use:link>{@html getTransactionMessage(tx) }</a>
               </div>
             {/each}
           {:else}
@@ -75,7 +75,7 @@
 
     </div>
 
-    <SendForm show={showSendForm} />
+    <SendForm show={showSendForm} wallets={$wallets} on:hide={ hideSendForm }/>
 
   </div>
 
@@ -89,6 +89,7 @@ import {startMine, stopMine} from '../actions'
 import SendForm from './partials/SendForm.svelte'
 
 let showSendForm = false
+const hideSendForm = () => showSendForm = false
 
 let chainReversed
 chain.subscribe(c => chainReversed = c.slice().reverse())

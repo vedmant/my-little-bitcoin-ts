@@ -54,16 +54,13 @@
 import moment from 'moment-mini'
 import bs58 from 'bs58'
 import { derived } from 'svelte/store'
-import { onMount } from 'svelte'
 import Transactions from './partials/Transactions.svelte'
 import {address} from '../store'
 import {getAddress} from '../actions'
 
 export let params = {}
 
-onMount(() => {
-  getAddress(params.id)
-})
+$: getAddress(params.id)
 
 const publicKey = derived(address, $address => {
   return bs58.decode(params.id).toString('hex')
