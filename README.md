@@ -1,13 +1,14 @@
 <p align="center">
-<a href="https://travis-ci.org/vedmant/my-little-bitcoin"><img src="https://travis-ci.org/vedmant/my-little-bitcoin.svg?branch=master" alt="Build Status"></a>
+<a href="https://travis-ci.org/vedmant/my-little-bitcoin-ts"><img src="https://travis-ci.org/vedmant/my-little-bitcoin-ts.svg?branch=master" alt="Build Status"></a>
 </p>
 
 # My Little Bitcoin
 ## TypeSctipt Implementation
+## With SPA client built on Svelte
 
-> A simple cryptocurrency implementation on JavaScript in just about 650 lines of code (without comments and client). It also includes WEB GUI written on Vue.js where you can send coins and explore blockchain.
+> A simple cryptocurrency implementation on TypeScript in just about 650 lines of code (without comments and client). It also includes WEB GUI written on Vue.js where you can send coins and explore blockchain.
 
-This implementation is pretty naive and suitable only for studying purpose. 
+This implementation is pretty naive and suitable only for studying purpose.
 
 [See Demo Here](https://my-little-bitcoin.vedmant.com/)
 
@@ -27,7 +28,7 @@ This implementation is pretty naive and suitable only for studying purpose.
 ### Installation ###
 
 ```bash
-git clone https://github.com/vedmant/my-little-bitcoin.git # To clone repo
+git clone https://github.com/vedmant/my-little-bitcoin-ts.git # To clone repo
 cd my-little-bitcoin
 yarn # Install dependencies
 yarn prod # Compile frontend resources
