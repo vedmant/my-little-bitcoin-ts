@@ -2,7 +2,7 @@
   <h3>My Wallets</h3>
   <hr>
 
-  <button class="btn btn-success mb-3" on:click={() => showCreateNew = true}>Create new</button>
+  <button class="btn btn-success mb-3" on:click={ () => showCreateNew = true }>Create new</button>
 
   <div class="table-responsive mb-5">
     <table class="table table-striped table-light">
@@ -22,43 +22,82 @@
           <td>{ wallet.balance }</td>
           <td>{ wallet.totalRecieved }</td>
           <td>{ wallet.totalSent }</td>
-          <td><button class="btn btn-primary pull-right btn-xs" on:click={onSendClick(wallet)}>Send</button></td>
+          <td><button class="btn btn-primary pull-right btn-xs" on:click={ () => onSendClick(wallet) }>Send</button></td>
         </tr>
       {/each}
       </tbody>
     </table>
   </div>
 
-  <!-- <b-modal v-model="showCreateNew" title="Create new wallet" ok-title="Create" @ok="onCreateSubmit">
-    <b-form>
-      <b-form-group label="Name">
-        <b-form-input type="text" v-model="newForm.name" required placeholder="Name"></b-form-input>
-      </b-form-group>
-      <input type="submit" style="position: absolute; left: -9999px"/>
-    </b-form>
-  </!--> -->
+  <div class="modal fade" tabindex="-1" role="dialog" id="create_modal">
+    <div class="modal-dialog" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Create new wallet</h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Name</label>
+            <input type="text" class={'form-control' + (error ? ' is-invalid' : '') } required placeholder="Wallet name" bind:value={ name }>
+            {#if error}
+              <div class="invalid-feedback">{ error }</div>
+            {/if}
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+          <button type="button" class="btn btn-primary" on:click={ create }>Send</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
-  <SendForm show={ showSendForm } wallets={ $wallets } on:hide={ hideSendForm }/>
+  <SendForm show={ showSendForm } wallets={ $wallets } fromDefault={ from } on:hide={ () => showSendForm = false }/>
 </div>
 
 <script>
-import {link} from 'svelte-spa-router'
-import {wallets, chain, mempool, block, mining, time} from '../store'
+import jquery from 'jquery'
+import { link } from 'svelte-spa-router'
+import { onMount } from 'svelte'
+import { wallets, chain } from '../store'
+import { getStatus, getWallets, createWallet } from '../actions'
 import SendForm from './partials/SendForm.svelte'
 
+let name = ''
+let error = ''
 let from = ''
-
 let selectedWallet = {}
-
 let showCreateNew = false
-const hideCreateNew = () => showCreateNew = false
-
 let showSendForm = false
-const hideSendForm = () => showSendForm = false
+
+onMount(async () => {
+  if (! $chain.length) await getStatus()
+  await getWallets()
+})
+
+$: if (showCreateNew) jquery('#create_modal').modal('show').on('hidden.bs.modal', function () {
+  showCreateNew = false
+})
 
 const onSendClick = (w) => {
   selectedWallet = w
   from = w.public
   showSendForm = true
 }
+
+const create = async () => {
+  if (! name) {
+    return error = 'Please type wallet name'
+  }
+
+  await createWallet(name)
+  await getWallets()
+  name = ''
+  error = ''
+  jquery('#create_modal').modal('hide')
+}
+
 </script>

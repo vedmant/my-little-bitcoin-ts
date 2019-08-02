@@ -17,15 +17,6 @@ import Block from './components/Block.svelte'
 import Address from './components/Address.svelte'
 import Transaction from './components/Transaction.svelte'
 import NotFound from './components/404.svelte'
-import { onMount } from 'svelte'
-import { loading, addToast } from './store'
-import { getStatus } from './actions'
-
-onMount(() => {
-  getStatus()
-})
-
-export let url = ''
 
 const routes = {
   '/': Status,

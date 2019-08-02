@@ -10,7 +10,7 @@
       <div class="modal-body">
         <div class="form-group">
           <label>From</label>
-          <select class="form-control" bind:value={ from } required>
+          <select class="form-control" bind:value={ from }>
             {#each wallets as wallet}
               <option value="{ wallet.public }">{ wallet.name }</option>
             {/each}
@@ -20,19 +20,25 @@
         <div class="form-group">
           <label>To</label>
           {#if $demoMode}
-            <select class="form-control" bind:value={ to } required>
+            <select class={'form-control' + (toError ? ' is-invalid' : '') } bind:value={ to }>
               {#each wallets as wallet}
                 <option value="{ wallet.public }">{ wallet.name }</option>
               {/each}
             </select>
           {:else}
-            <input type="text" class="form-control" required placeholder="To" bind:value={ to }>
+            <input type="text" class={'form-control' + (toError ? ' is-invalid' : '') } placeholder="To" bind:value={ to }>
+          {/if}
+          {#if toError}
+            <div class="invalid-feedback">{ toError }</div>
           {/if}
         </div>
 
         <div class="form-group">
           <label>Amount</label>
-          <input type="text" class="form-control" required placeholder="Amount" bind:value={ amount }>
+          <input type="text" class={'form-control' + (amountError ? ' is-invalid' : '') } placeholder="Amount" bind:value={ amount }>
+          {#if amountError}
+            <div class="invalid-feedback">{ amountError }</div>
+          {/if}
         </div>
 
       </div>
@@ -50,18 +56,24 @@ import { createEventDispatcher, onMount } from 'svelte'
 import { demoMode } from '../../store'
 import { sendFunds } from '../../actions'
 
+
 const dispatch = createEventDispatcher()
 
 export let wallets = []
 export let show = false
+export let fromDefault = ''
 
 let from = ''
 let to = ''
 let amount = ''
+let amountError = ''
+let toError = ''
 
-$: if (from === '' && wallets.length > 0) from = wallets[0].public
+$: if (from === '' && (wallets.length > 0 || fromDefault)) from = fromDefault || wallets[0].public
 $: if (to === '' && wallets.length > 1) to = wallets[1].public
 $: if (show === true) jquery('#send_modal').modal('show')
+
+$: from = fromDefault
 
 onMount(() => {
   jquery('#send_modal').on('hidden.bs.modal', function () {
@@ -70,9 +82,18 @@ onMount(() => {
 })
 
 const send = () => {
-  sendFunds({from, to, amount})
+  if (isNaN(amount) || amount <= 0) {
+    return amountError = 'Amount have to be positive integer'
+  }
+  if (! to) {
+    return toError = 'Please fill in recieving (to) wallet'
+  }
+
+  sendFunds({from, to, amount: Math.round(amount)})
   jquery('#send_modal').modal('hide')
   amount = ''
+  amountError = ''
+  toError = ''
 }
 
 </script>

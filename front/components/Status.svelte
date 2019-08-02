@@ -83,10 +83,15 @@
 
 <script>
 import moment from 'moment-mini'
-import {link} from 'svelte-spa-router'
-import {wallets, chain, mempool, block, mining, time} from '../store'
-import {startMine, stopMine} from '../actions'
+import { link } from 'svelte-spa-router'
+import { onMount } from 'svelte'
+import { wallets, chain, mempool, block, mining, time } from '../store'
+import { startMine, stopMine, getStatus } from '../actions'
 import SendForm from './partials/SendForm.svelte'
+
+onMount(() => {
+  getStatus()
+})
 
 let showSendForm = false
 const hideSendForm = () => showSendForm = false
